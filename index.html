@@ -5,28 +5,1666 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ore Empire</title>
     <style>
-        body { background-color: #1e1e1e; color: #f0f0f0; font-family: Arial, sans-serif; margin: 0; padding: 0; }
-        .ore { transition: all 0.3s ease; }
-        /* Additional CSS for styles */
+        /* ─── Reset & Base ─────────────────────────────────────────────── */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0d0d0f;
+            --surface:   #16181c;
+            --surface2:  #1e2128;
+            --border:    #2a2d36;
+            --text:      #e8eaf0;
+            --muted:     #7a7f90;
+            --accent:    #4fa3e0;
+            --gold:      #f5c842;
+            --green:     #3ecf6a;
+            --red:       #e05454;
+            --stone:     #9e9e9e;
+            --copper:    #e87a30;
+            --iron:      #c0c0c0;
+            --gold-ore:  #f5c842;
+            --diamond:   #4fc3f7;
+            --mythril:   #b57bee;
+            --void:      #00e5ff;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 13px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ─── Top Bar ───────────────────────────────────────────────────── */
+        #top-bar {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        #top-bar .game-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 1px;
+            margin-right: 12px;
+            white-space: nowrap;
+        }
+
+        #top-bar .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        #top-bar .stat-label {
+            color: var(--muted);
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        #top-bar .stat-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--gold);
+            min-width: 90px;
+        }
+
+        #top-bar .stat-value.green { color: var(--green); }
+        #top-bar .stat-value.blue  { color: var(--accent); }
+
+        .prestige-btn {
+            margin-left: auto;
+            padding: 6px 14px;
+            background: linear-gradient(135deg, #6a0dad, #b57bee);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 12px;
+            cursor: pointer;
+            display: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+            white-space: nowrap;
+        }
+
+        .prestige-btn:hover {
+            transform: scale(1.04);
+            box-shadow: 0 0 12px #b57bee88;
+        }
+
+        /* ─── Main Layout ───────────────────────────────────────────────── */
+        #main {
+            display: grid;
+            grid-template-columns: 200px 1fr 260px;
+            grid-template-rows: 1fr auto;
+            flex: 1;
+            overflow: hidden;
+            gap: 1px;
+            background: var(--border);
+        }
+
+        .panel {
+            background: var(--surface);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .panel::-webkit-scrollbar { width: 5px; }
+        .panel::-webkit-scrollbar-track { background: transparent; }
+        .panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        /* ─── Left Panel (Miner) ────────────────────────────────────────── */
+        #left-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 8px;
+            gap: 12px;
+        }
+
+        .panel-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            font-weight: 600;
+            align-self: flex-start;
+            padding: 0 4px;
+        }
+
+        /* SVG miner animation */
+        #miner-scene {
+            width: 160px;
+            height: 160px;
+            position: relative;
+        }
+
+        #miner-scene svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Ore particle container */
+        #particle-container {
+            position: fixed;
+            pointer-events: none;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 999;
+            overflow: hidden;
+        }
+
+        .ore-particle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFly 0.8s ease-out forwards;
+        }
+
+        @keyframes particleFly {
+            0%   { opacity: 1; transform: translate(0,0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+        }
+
+        /* Miner ore type indicator */
+        .current-ore-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .ore-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Ore stats in left panel */
+        .ore-stats-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .ore-stat-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            background: var(--surface2);
+            border: 1px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+        .ore-stat-row.active { border-color: var(--border); }
+
+        .ore-stat-row.locked { opacity: 0.35; }
+
+        .ore-stat-row .ore-name { flex: 1; font-size: 11px; }
+        .ore-stat-row .ore-val  { font-size: 11px; color: var(--gold); }
+
+        /* ─── Center Panel (Resources) ──────────────────────────────────── */
+        #center-panel {
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* Resource cards */
+        .ore-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: border-color 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ore-card.unlocking {
+            animation: unlockFlash 1s ease-out;
+        }
+
+        @keyframes unlockFlash {
+            0%   { box-shadow: 0 0 30px currentColor; border-color: currentColor; }
+            100% { box-shadow: none; }
+        }
+
+        .ore-card.locked { opacity: 0.4; filter: grayscale(1); }
+
+        .ore-card-icon {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .ore-card-info { flex: 1; }
+        .ore-card-name { font-size: 14px; font-weight: 700; }
+        .ore-card-rate { font-size: 11px; color: var(--muted); }
+
+        .ore-card-amount {
+            font-size: 20px;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        /* Rate progress bar */
+        .ore-card-bar {
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 2px;
+            background: currentColor;
+            opacity: 0.5;
+            transition: width 1s linear;
+        }
+
+        /* MKP display */
+        #mkp-display {
+            background: linear-gradient(135deg, #1a0a2e, #2a1040);
+            border: 1px solid #6a0dad55;
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #mkp-display .mkp-icon { font-size: 24px; }
+        #mkp-display .mkp-text { flex: 1; }
+        #mkp-display .mkp-label { font-size: 11px; color: #b57bee; text-transform: uppercase; letter-spacing: 0.8px; }
+        #mkp-display .mkp-value { font-size: 18px; font-weight: 800; color: #b57bee; }
+
+        /* event banner */
+        #event-banner {
+            background: linear-gradient(135deg, #1a2a0a, #2a3a10);
+            border: 1px solid #3ecf6a44;
+            border-radius: 8px;
+            padding: 8px 14px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #event-banner.bad {
+            background: linear-gradient(135deg, #2a0a0a, #3a1010);
+            border-color: #e0545444;
+        }
+
+        #event-banner .event-icon { font-size: 20px; }
+        #event-banner .event-text { flex: 1; }
+        #event-banner .event-name { font-size: 13px; font-weight: 700; }
+        #event-banner .event-desc { font-size: 11px; color: var(--muted); }
+        #event-banner .event-timer { font-size: 13px; font-weight: 700; color: var(--green); }
+        #event-banner.bad .event-timer { color: var(--red); }
+
+        /* ─── Right Panel (Upgrades) ────────────────────────────────────── */
+        #right-panel {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 5px 4px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            color: var(--muted);
+            font-size: 11px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .tab-content { display: none; flex-direction: column; gap: 6px; flex: 1; }
+        .tab-content.active { display: flex; }
+
+        /* upgrade / unit cards */
+        .upgrade-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upgrade-card:not(.locked):not(.bought):hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 8px var(--accent)44;
+            transform: translateY(-1px);
+        }
+
+        .upgrade-card.locked   { opacity: 0.4; cursor: default; }
+        .upgrade-card.bought   { opacity: 0.6; cursor: default; border-color: var(--green); }
+
+        .upgrade-card.buying {
+            animation: buyFlash 0.3s ease-out;
+        }
+
+        @keyframes buyFlash {
+            0%   { box-shadow: 0 0 20px var(--gold); }
+            100% { box-shadow: none; }
+        }
+
+        .upgrade-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .upgrade-icon { font-size: 16px; }
+        .upgrade-name { font-size: 12px; font-weight: 700; flex: 1; }
+        .upgrade-cost {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .upgrade-cost.cant-afford { color: var(--red); }
+        .upgrade-desc { font-size: 10px; color: var(--muted); }
+        .bought-badge {
+            display: none;
+            font-size: 10px;
+            color: var(--green);
+            font-weight: 700;
+        }
+        .upgrade-card.bought .bought-badge { display: inline; }
+        .upgrade-card.bought .upgrade-cost { display: none; }
+
+        /* Unit cards */
+        .unit-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+        }
+
+        .unit-card:not(.locked):hover {
+            border-color: var(--green);
+            box-shadow: 0 0 8px var(--green)44;
+            transform: translateY(-1px);
+        }
+
+        .unit-card.locked { opacity: 0.4; cursor: default; }
+
+        .unit-card.buying { animation: buyFlash 0.3s ease-out; }
+
+        .unit-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 3px;
+        }
+
+        .unit-icon   { font-size: 16px; }
+        .unit-name   { font-size: 12px; font-weight: 700; flex: 1; }
+        .unit-count  { font-size: 14px; font-weight: 800; color: var(--green); min-width: 28px; text-align: right; }
+        .unit-cost   { font-size: 11px; font-weight: 700; color: var(--gold); }
+        .unit-cost.cant-afford { color: var(--red); }
+        .unit-prod   { font-size: 10px; color: var(--muted); }
+
+        /* ─── Bottom Panel (Automation) ─────────────────────────────────── */
+        #bottom-panel {
+            grid-column: 1 / -1;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+            overflow-x: auto;
+        }
+
+        #bottom-panel::-webkit-scrollbar { height: 4px; }
+        #bottom-panel::-webkit-scrollbar-track { background: transparent; }
+        #bottom-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        .bottom-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .unit-summary {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 5px 10px;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .unit-summary .us-icon { font-size: 16px; }
+        .unit-summary .us-count { font-size: 13px; font-weight: 700; color: var(--green); }
+        .unit-summary .us-prod  { font-size: 10px; color: var(--muted); }
+
+        /* ─── Achievements ──────────────────────────────────────────────── */
+        .achievement-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 7px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .achievement-card.earned {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, #1e1800, #2a2200);
+        }
+
+        .achievement-card.locked { opacity: 0.35; }
+
+        .ach-icon { font-size: 18px; }
+        .ach-name { font-size: 11px; font-weight: 700; }
+        .ach-desc { font-size: 10px; color: var(--muted); }
+
+        /* ─── Toast Notifications ───────────────────────────────────────── */
+        #toast-container {
+            position: fixed;
+            top: 60px;
+            right: 16px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            min-width: 200px;
+            animation: toastIn 0.3s ease, toastOut 0.4s ease 2.6s forwards;
+            pointer-events: none;
+        }
+
+        .toast.gold   { border-color: var(--gold);    color: var(--gold); }
+        .toast.green  { border-color: var(--green);   color: var(--green); }
+        .toast.purple { border-color: #b57bee;        color: #b57bee; }
+        .toast.blue   { border-color: var(--accent);  color: var(--accent); }
+        .toast.red    { border-color: var(--red);     color: var(--red); }
+
+        @keyframes toastIn  { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: translateX(0); } }
+        @keyframes toastOut { from { opacity:1; } to { opacity:0; transform: translateX(20px); } }
+
+        /* ─── Prestige Modal ────────────────────────────────────────────── */
+        #prestige-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000000bb;
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #prestige-modal.open { display: flex; }
+
+        .modal-box {
+            background: var(--surface);
+            border: 1px solid #b57bee55;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal-box h2 { font-size: 22px; color: #b57bee; margin-bottom: 8px; }
+        .modal-box p  { color: var(--muted); font-size: 13px; margin-bottom: 16px; line-height: 1.5; }
+        .modal-box .mkp-reward { font-size: 28px; font-weight: 800; color: #b57bee; margin-bottom: 16px; }
+
+        .modal-box .modal-btns {
+            display: flex; gap: 10px; justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .btn:hover { transform: scale(1.03); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #6a0dad, #b57bee);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        /* ─── Misc ──────────────────────────────────────────────────────── */
+        .section-sep {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        /* miner swing animation */
+        @keyframes minerSwing {
+            0%   { transform: rotate(-20deg); }
+            40%  { transform: rotate(25deg); }
+            55%  { transform: rotate(20deg); }
+            100% { transform: rotate(-20deg); }
+        }
+
+        #pickaxe-arm { transform-origin: 30px 40px; animation: minerSwing 0.8s ease-in-out infinite; }
+
+        /* rock shake */
+        @keyframes rockShake {
+            0%,100%  { transform: translate(0,0); }
+            20%      { transform: translate(-2px, 1px); }
+            40%      { transform: translate(2px,-1px); }
+            60%      { transform: translate(-1px, 2px); }
+            80%      { transform: translate(1px,-2px); }
+        }
+
+        #rock-group { animation: rockShake 0.8s ease-in-out infinite; transform-origin: center; }
+
+        /* money counter roll */
+        @keyframes moneyPop {
+            0%   { transform: scale(1.15); color: var(--green); }
+            100% { transform: scale(1);    color: var(--gold); }
+        }
+
+        .money-pop { animation: moneyPop 0.3s ease-out; }
+
+        /* Scrollable lists */
+        .scroll-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 2px;
+        }
+
+        .scroll-list::-webkit-scrollbar { width: 4px; }
+        .scroll-list::-webkit-scrollbar-track { background: transparent; }
+        .scroll-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
     </style>
 </head>
 <body>
-    <h1>Ore Empire</h1>
-    <div id="ore-container">
-        <!-- Ore generation will be displayed here -->
+
+<!-- Particle layer -->
+<div id="particle-container"></div>
+
+<!-- Toast notifications -->
+<div id="toast-container"></div>
+
+<!-- Prestige modal -->
+<div id="prestige-modal">
+    <div class="modal-box">
+        <h2>⚡ Prestige: Rebuild the Empire</h2>
+        <p>Reset your progress and gain <strong>Mining Knowledge Points</strong> that permanently multiply your output forever.</p>
+        <div class="mkp-reward" id="modal-mkp-reward">+5 MKP</div>
+        <p>Your current MKP: <span id="modal-current-mkp">0</span></p>
+        <div class="modal-btns">
+            <button class="btn btn-primary" onclick="confirmPrestige()">Prestige!</button>
+            <button class="btn btn-secondary" onclick="closePrestigeModal()">Not yet</button>
+        </div>
     </div>
-    <script>
-        // Vanilla JavaScript for game logic
-        let ores = {
-            Stone: { amount: 0, color: 'gray' },
-            Copper: { amount: 0, color: 'orange' },
-            Iron: { amount: 0, color: 'silver' },
-            Gold: { amount: 0, color: 'gold' },
-            Diamond: { amount: 0, color: 'blue' },
-            Mythril: { amount: 0, color: 'purple' },
-            VoidOre: { amount: 0, color: 'cyan' }
-        };
-        // Core Mining mechanics and game loop\n        // LocalStorage auto-save\n        // Update UI every 10 seconds\n        // Formatting functions and animations
-    </script>
+</div>
+
+<!-- ─── TOP BAR ─────────────────────────────────────────────────────────── -->
+<div id="top-bar">
+    <span class="game-title">⛏ ORE EMPIRE</span>
+
+    <div class="stat">
+        <span class="stat-label">Money</span>
+        <span class="stat-value" id="stat-money">$0</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">$/sec</span>
+        <span class="stat-value green" id="stat-income">$0/s</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Total Miners</span>
+        <span class="stat-value blue" id="stat-miners">0</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Ore/sec</span>
+        <span class="stat-value blue" id="stat-ores">0</span>
+    </div>
+    <div class="stat" id="stat-mkp-container" style="display:none">
+        <span class="stat-label">MKP</span>
+        <span class="stat-value" style="color:#b57bee" id="stat-mkp">0</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Total Earned</span>
+        <span class="stat-value" id="stat-total">$0</span>
+    </div>
+
+    <button class="prestige-btn" id="prestige-btn" onclick="openPrestigeModal()">⚡ Prestige</button>
+</div>
+
+<!-- ─── MAIN ───────────────────────────────────────────────────────────── -->
+<div id="main">
+
+    <!-- LEFT PANEL -->
+    <div class="panel" id="left-panel">
+        <span class="panel-title">Mining</span>
+
+        <!-- SVG miner scene -->
+        <div id="miner-scene">
+            <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+                <!-- background glow -->
+                <circle cx="80" cy="80" r="70" fill="#1e2128" />
+                <circle cx="80" cy="80" r="65" fill="none" stroke="#2a2d36" stroke-width="1"/>
+
+                <!-- rock -->
+                <g id="rock-group">
+                    <polygon points="55,115 105,115 115,90 95,70 65,70 45,90" fill="#3a3a3a" stroke="#555" stroke-width="1.5"/>
+                    <polygon points="65,70 95,70 88,78 72,78" fill="#4a4a4a"/>
+                    <circle cx="70" cy="95" r="4" fill="#2a2a2a" opacity="0.6"/>
+                    <circle cx="85" cy="105" r="3" fill="#2a2a2a" opacity="0.5"/>
+                    <circle cx="95" cy="90" r="2.5" fill="#2a2a2a" opacity="0.4"/>
+                </g>
+
+                <!-- miner body -->
+                <g id="miner-body">
+                    <!-- legs -->
+                    <rect x="67" y="100" width="10" height="18" rx="3" fill="#4a4a70"/>
+                    <rect x="81" y="100" width="10" height="18" rx="3" fill="#4a4a70"/>
+                    <!-- boots -->
+                    <rect x="64" y="114" width="14" height="7" rx="2" fill="#2a2a3a"/>
+                    <rect x="79" y="114" width="14" height="7" rx="2" fill="#2a2a3a"/>
+                    <!-- torso -->
+                    <rect x="63" y="72" width="32" height="30" rx="5" fill="#5c6bc0"/>
+                    <!-- belt -->
+                    <rect x="63" y="96" width="32" height="5" rx="1" fill="#7986cb"/>
+                    <!-- head -->
+                    <circle cx="79" cy="62" r="14" fill="#d4956a"/>
+                    <!-- helmet -->
+                    <path d="M65,62 Q65,42 79,42 Q93,42 93,62" fill="#c0392b"/>
+                    <rect x="65" y="58" width="28" height="6" rx="2" fill="#c0392b"/>
+                    <!-- helmet lamp -->
+                    <circle cx="79" cy="46" r="4" fill="#f5c842"/>
+                    <circle cx="79" cy="46" r="6" fill="#f5c84244"/>
+                    <!-- eyes -->
+                    <circle cx="73" cy="63" r="2.5" fill="#2c1810"/>
+                    <circle cx="85" cy="63" r="2.5" fill="#2c1810"/>
+                </g>
+
+                <!-- pickaxe arm (animated) -->
+                <g id="pickaxe-arm">
+                    <!-- arm -->
+                    <rect x="90" y="72" width="9" height="26" rx="4" fill="#d4956a" transform="rotate(15,94,80)"/>
+                    <!-- handle -->
+                    <rect x="93" y="80" width="5" height="38" rx="2" fill="#8B6914" transform="rotate(15,95,95)"/>
+                    <!-- pickaxe head -->
+                    <g transform="rotate(15,95,118) translate(87,112)">
+                        <polygon points="0,0 22,0 22,8 0,8" fill="#9e9e9e" rx="2"/>
+                        <polygon points="22,0 30,-6 30,8 22,8" fill="#bdbdbd"/>
+                        <polygon points="0,0 -6,-5 -2,8 0,8" fill="#bdbdbd"/>
+                    </g>
+                </g>
+
+                <!-- ore label at bottom -->
+                <text id="ore-svg-label" x="80" y="152" text-anchor="middle" fill="#7a7f90" font-size="10" font-family="sans-serif">Mining Stone</text>
+            </svg>
+        </div>
+
+        <!-- current ore badge -->
+        <div class="current-ore-badge" id="current-ore-badge">
+            <span class="ore-dot" id="badge-dot" style="background:var(--stone)"></span>
+            <span id="badge-name">Stone</span>
+        </div>
+
+        <!-- ore stats -->
+        <div class="panel-title" style="margin-top:8px">Ores Mined</div>
+        <div class="ore-stats-list" id="ore-stats-list"></div>
+    </div>
+
+    <!-- CENTER PANEL -->
+    <div class="panel" id="center-panel">
+
+        <!-- MKP display (post-prestige) -->
+        <div id="mkp-display">
+            <span class="mkp-icon">⚗</span>
+            <div class="mkp-text">
+                <div class="mkp-label">Mining Knowledge Points</div>
+                <div class="mkp-value" id="mkp-value-center">0 MKP</div>
+            </div>
+        </div>
+
+        <!-- event banner -->
+        <div id="event-banner">
+            <span class="event-icon" id="event-icon">⚡</span>
+            <div class="event-text">
+                <div class="event-name" id="event-name">Ore Rush!</div>
+                <div class="event-desc" id="event-desc">2x mining for a limited time</div>
+            </div>
+            <span class="event-timer" id="event-timer">30s</span>
+        </div>
+
+        <!-- ore resource cards -->
+        <div id="ore-cards"></div>
+
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel" id="right-panel">
+
+        <div class="tab-bar">
+            <div class="tab-btn active" onclick="switchTab('upgrades')">Upgrades</div>
+            <div class="tab-btn" onclick="switchTab('units')">Units</div>
+            <div class="tab-btn" onclick="switchTab('achievements')">🏆</div>
+        </div>
+
+        <!-- Upgrades tab -->
+        <div class="tab-content active scroll-list" id="tab-upgrades"></div>
+
+        <!-- Units tab -->
+        <div class="tab-content scroll-list" id="tab-units"></div>
+
+        <!-- Achievements tab -->
+        <div class="tab-content scroll-list" id="tab-achievements"></div>
+
+    </div>
+
+    <!-- BOTTOM PANEL -->
+    <div id="bottom-panel">
+        <span class="bottom-label">Workforce</span>
+        <div id="unit-summaries"></div>
+    </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   ORE EMPIRE – Game Logic
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// ─── Constants ──────────────────────────────────────────────────────────
+
+const ORE_TYPES = [
+    { id:'stone',   name:'Stone',   icon:'🪨', color:'#9e9e9e', value:1,     unlock:0,          emoji:'🪨' },
+    { id:'copper',  name:'Copper',  icon:'🟠', color:'#e87a30', value:3,     unlock:100,        emoji:'🟠' },
+    { id:'iron',    name:'Iron',    icon:'⚙️',  color:'#c0c0c0', value:10,    unlock:1000,       emoji:'⚙️'  },
+    { id:'gold',    name:'Gold',    icon:'✨', color:'#f5c842', value:50,    unlock:10000,      emoji:'✨' },
+    { id:'diamond', name:'Diamond', icon:'💎', color:'#4fc3f7', value:200,   unlock:100000,     emoji:'💎' },
+    { id:'mythril', name:'Mythril', icon:'🔮', color:'#b57bee', value:1000,  unlock:1000000,    emoji:'🔮' },
+    { id:'void',    name:'Void Ore',icon:'🌀', color:'#00e5ff', value:10000, unlock:100000000,  emoji:'🌀' },
+];
+
+const UNITS = [
+    { id:'miner',     name:'Miner',              icon:'⛏️',  baseCost:50,      orePerSec:1,     costMult:1.12 },
+    { id:'drill',     name:'Drill',              icon:'🔩', baseCost:500,     orePerSec:10,    costMult:1.13 },
+    { id:'rig',       name:'Mining Rig',         icon:'🏗️',  baseCost:5000,    orePerSec:100,   costMult:1.14 },
+    { id:'industrial',name:'Industrial Mine',    icon:'🏭', baseCost:50000,   orePerSec:1000,  costMult:1.15 },
+    { id:'planetary', name:'Planetary Extractor',icon:'🌍', baseCost:5000000, orePerSec:10000, costMult:1.16 },
+];
+
+const UPGRADES = [
+    // Miner upgrades
+    { id:'pickaxe',    name:'Pickaxe Upgrade',      icon:'⛏️',  cost:75,        desc:'+50% mining speed',       type:'speed',   mult:1.5,  req:0 },
+    { id:'drill1',     name:'Drill Machine',         icon:'🔩', cost:500,       desc:'+5 bonus miners',          type:'miners',  add:5,     req:100 },
+    { id:'hardhat',    name:'Hard Hat Tech',         icon:'⛑️',  cost:1200,      desc:'+100% miner production',  type:'minerProd',mult:2,   req:500 },
+    { id:'dynamite',   name:'Dynamite Blasting',     icon:'💥', cost:8000,      desc:'+3x mining speed',         type:'speed',   mult:3,    req:2000 },
+    { id:'qdrill',     name:'Quantum Drill',         icon:'⚡', cost:100000,    desc:'+500% mining power',       type:'speed',   mult:6,    req:50000 },
+    { id:'nanobot',    name:'Nanobot Swarm',         icon:'🤖', cost:2000000,   desc:'+1000% mining power',      type:'speed',   mult:11,   req:500000 },
+    // Fortune upgrades
+    { id:'refine',     name:'Ore Refinement',        icon:'⚗️',  cost:200,       desc:'+20% ore value',           type:'value',   mult:1.2,  req:150 },
+    { id:'market',     name:'Market Optimization',   icon:'📈', cost:2500,      desc:'+50% ore sale value',      type:'value',   mult:1.5,  req:1000 },
+    { id:'blackmkt',   name:'Black Market Contracts',icon:'🕵️',  cost:25000,     desc:'+200% ore value',          type:'value',   mult:3,    req:10000 },
+    { id:'fincorp',    name:'Finance Corp',          icon:'🏦', cost:500000,    desc:'+500% ore value',          type:'value',   mult:6,    req:100000 },
+    { id:'trading',    name:'Automated Trading',     icon:'🤝', cost:5000000,   desc:'+1000% ore value',         type:'value',   mult:11,   req:2000000 },
+    // Speed upgrades (reduce effective interval)
+    { id:'speed1',     name:'Quick Hands',           icon:'🏃', cost:150,       desc:'Mine 20% faster',          type:'interval',mult:0.8,  req:50 },
+    { id:'speed2',     name:'Turbo Miners',          icon:'💨', cost:3000,      desc:'Mine 40% faster',          type:'interval',mult:0.75, req:1500 },
+    { id:'speed3',     name:'Hyperdrive Mining',     icon:'🚀', cost:50000,     desc:'Mine 60% faster',          type:'interval',mult:0.67, req:20000 },
+    { id:'speed4',     name:'Temporal Acceleration', icon:'⏩', cost:1000000,   desc:'Mine 80% faster',          type:'interval',mult:0.5,  req:500000 },
+    // MKP upgrades (only visible after 1st prestige)
+    { id:'mkp1',       name:'Mining Heritage I',     icon:'🌟', cost:3,         desc:'+10% global speed (MKP)',  type:'mkpSpeed',mult:1.1,  req:0, mkp:true },
+    { id:'mkp2',       name:'Mining Heritage II',    icon:'🌟', cost:8,         desc:'+25% global speed (MKP)',  type:'mkpSpeed',mult:1.25, req:0, mkp:true },
+    { id:'mkp3',       name:'Value Mastery I',       icon:'💫', cost:5,         desc:'+25% ore value (MKP)',     type:'mkpValue',mult:1.25, req:0, mkp:true },
+    { id:'mkp4',       name:'Value Mastery II',      icon:'💫', cost:12,        desc:'+50% ore value (MKP)',     type:'mkpValue',mult:1.5,  req:0, mkp:true },
+];
+
+const ACHIEVEMENTS = [
+    { id:'first_ore',    name:'First Strike',         icon:'⛏️',  desc:'Mine your first ore',              check: s => s.totalOre >= 1 },
+    { id:'ore100',       name:'Ore Hoarder',           icon:'🪨', desc:'Mine 100 ore total',               check: s => s.totalOre >= 100 },
+    { id:'ore1k',        name:'Deep Digger',           icon:'🕳️',  desc:'Mine 1,000 ore total',             check: s => s.totalOre >= 1000 },
+    { id:'ore1m',        name:'Ore Baron',             icon:'🏔️',  desc:'Mine 1,000,000 ore total',         check: s => s.totalOre >= 1000000 },
+    { id:'money100',     name:'Pocket Change',         icon:'💰', desc:'Earn $100',                        check: s => s.totalEarned >= 100 },
+    { id:'money1k',      name:'Entrepreneur',          icon:'💼', desc:'Earn $1,000',                      check: s => s.totalEarned >= 1000 },
+    { id:'money1m',      name:'Millionaire',           icon:'🤑', desc:'Earn $1,000,000',                  check: s => s.totalEarned >= 1000000 },
+    { id:'money1b',      name:'Billionaire',           icon:'🏦', desc:'Earn $1,000,000,000',              check: s => s.totalEarned >= 1000000000 },
+    { id:'miners10',     name:'Gang Boss',             icon:'👷', desc:'Have 10 miners',                   check: s => s.units.miner >= 10 },
+    { id:'miners100',    name:'Union Leader',          icon:'🏗️',  desc:'Have 100 miners',                  check: s => s.units.miner >= 100 },
+    { id:'prestige1',    name:'New Horizon',           icon:'⚡', desc:'Prestige for the first time',      check: s => s.prestigeCount >= 1 },
+    { id:'copper_unlock',name:'Going Deeper',          icon:'🟠', desc:'Unlock Copper ore',                check: s => s.totalEarned >= 100 },
+    { id:'diamond_unlock',name:'Gem Collector',        icon:'💎', desc:'Unlock Diamond ore',               check: s => s.totalEarned >= 100000 },
+    { id:'void_unlock',  name:'Void Walker',           icon:'🌀', desc:'Unlock Void Ore',                  check: s => s.totalEarned >= 100000000 },
+];
+
+const RANDOM_EVENTS = [
+    { id:'rush',     name:'Ore Rush!',       icon:'⚡', desc:'2x mining for 30 seconds!',  duration:30, type:'buff',   factor:2 },
+    { id:'collapse', name:'Cave Collapse!',  icon:'💥', desc:'Mining slowed for 10 seconds',duration:10, type:'debuff', factor:0.3 },
+    { id:'vein',     name:'Rich Vein Found!',icon:'💎', desc:'3x ore value for 20 seconds!',duration:20, type:'buff',   factor:3, valueEvent:true },
+];
+
+const PRESTIGE_THRESHOLD = 10_000_000_000;   // $10 billion
+const SAVE_KEY = 'oreEmpire_v2';
+
+// ─── Game State ──────────────────────────────────────────────────────────
+
+function freshState() {
+    return {
+        money: 0,
+        totalEarned: 0,
+        totalOre: 0,
+        ore: Object.fromEntries(ORE_TYPES.map(o => [o.id, 0])),
+        units: Object.fromEntries(UNITS.map(u => [u.id, 0])),
+        upgrades: {},           // id → true
+        mkp: 0,
+        mkpUpgrades: {},        // id → true
+        prestigeCount: 0,
+        achievements: {},       // id → true
+        event: null,            // { id, timer, factor, valueEvent }
+        eventCooldown: 0,       // seconds before next event can occur
+        lastSave: Date.now(),
+    };
+}
+
+let G = freshState();
+
+// ─── Derived stats (recomputed each tick) ────────────────────────────────
+
+let derived = {
+    baseOrePerSec: 1,   // from 1 base miner
+    speedMult: 1,
+    valueMult: 1,
+    intervalMult: 1,    // < 1 = faster
+    eventMult: 1,
+    eventValueMult: 1,
+    totalOrePerSec: 0,
+    currentOreId: 'stone',
+    incomePerSec: 0,
+};
+
+function recompute() {
+    let speedMult = 1;
+    let valueMult = 1;
+    let intervalMult = 1;
+    let bonusMiners = 0;
+    let mkpSpeedMult = 1;
+    let mkpValueMult = 1;
+    let minerProdMult = 1;
+
+    for (const upg of UPGRADES) {
+        if (!upg.mkp && G.upgrades[upg.id]) {
+            if (upg.type === 'speed')     speedMult    *= upg.mult;
+            if (upg.type === 'value')     valueMult    *= upg.mult;
+            if (upg.type === 'interval')  intervalMult *= upg.mult;
+            if (upg.type === 'miners')    bonusMiners  += upg.add;
+            if (upg.type === 'minerProd') minerProdMult*= upg.mult;
+        }
+        if (upg.mkp && G.mkpUpgrades[upg.id]) {
+            if (upg.type === 'mkpSpeed') mkpSpeedMult *= upg.mult;
+            if (upg.type === 'mkpValue') mkpValueMult *= upg.mult;
+        }
+    }
+
+    // effective ore/sec from workforce
+    let workforceOre = 0;
+    for (const u of UNITS) {
+        workforceOre += G.units[u.id] * u.orePerSec;
+    }
+
+    // base miner + bonus
+    const totalMiners = 1 + bonusMiners + G.units.miner;
+    const baseOrePerSec = (totalMiners * speedMult * minerProdMult + workforceOre) * mkpSpeedMult;
+
+    // event multiplier
+    const eventMult       = derived.eventMult       || 1;
+    const eventValueMult  = derived.eventValueMult  || 1;
+
+    const effectiveOrePerSec = baseOrePerSec * eventMult / intervalMult;
+
+    // highest unlocked ore
+    let currentOre = ORE_TYPES[0];
+    for (const o of ORE_TYPES) {
+        if (G.totalEarned >= o.unlock) currentOre = o;
+    }
+
+    const oreValue = currentOre.value * valueMult * mkpValueMult * eventValueMult;
+    const incomePerSec = effectiveOrePerSec * oreValue;
+
+    derived.speedMult        = speedMult;
+    derived.valueMult        = valueMult;
+    derived.intervalMult     = intervalMult;
+    derived.bonusMiners      = bonusMiners;
+    derived.minerProdMult    = minerProdMult;
+    derived.mkpSpeedMult     = mkpSpeedMult;
+    derived.mkpValueMult     = mkpValueMult;
+    derived.workforceOre     = workforceOre;
+    derived.totalOrePerSec   = effectiveOrePerSec;
+    derived.currentOre       = currentOre;
+    derived.oreValue         = oreValue;
+    derived.incomePerSec     = incomePerSec;
+    derived.totalMiners      = totalMiners;
+}
+
+// ─── Number Formatting ───────────────────────────────────────────────────
+
+function fmt(n) {
+    if (n < 1000)     return n.toFixed(n < 10 ? 1 : 0);
+    if (n < 1e6)      return (n/1000).toFixed(2) + 'K';
+    if (n < 1e9)      return (n/1e6).toFixed(2) + 'M';
+    if (n < 1e12)     return (n/1e9).toFixed(2) + 'B';
+    if (n < 1e15)     return (n/1e12).toFixed(2) + 'T';
+    return (n/1e15).toFixed(2) + 'Q';
+}
+
+function fmtMoney(n) { return '$' + fmt(n); }
+
+// ─── Unit cost calculator ────────────────────────────────────────────────
+
+function unitCost(unit) {
+    const count = G.units[unit.id] || 0;
+    return Math.floor(unit.baseCost * Math.pow(unit.costMult, count));
+}
+
+// ─── Game Tick ───────────────────────────────────────────────────────────
+
+let tickInterval = null;
+let lastTick = Date.now();
+
+function gameTick() {
+    const now = Date.now();
+    const delta = (now - lastTick) / 1000;
+    lastTick = now;
+
+    recompute();
+
+    // Generate ore & money
+    const oreGenerated = derived.totalOrePerSec * delta;
+    const moneyEarned  = oreGenerated * derived.oreValue;
+
+    G.ore[derived.currentOre.id] += oreGenerated;
+    G.money        += moneyEarned;
+    G.totalEarned  += moneyEarned;
+    G.totalOre     += oreGenerated;
+
+    // Ore particles occasionally
+    if (Math.random() < delta * 2) spawnParticles(derived.currentOre.color, 3);
+
+    // Event timer
+    if (G.event) {
+        G.event.timer -= delta;
+        if (G.event.timer <= 0) endEvent();
+    }
+
+    if (G.eventCooldown > 0) {
+        G.eventCooldown -= delta;
+    } else if (!G.event && Math.random() < delta / 120) {
+        // ~1 event per 2 minutes
+        triggerRandomEvent();
+    }
+
+    // Check achievements
+    checkAchievements();
+
+    // Prestige button
+    const pb = document.getElementById('prestige-btn');
+    if (G.totalEarned >= PRESTIGE_THRESHOLD) {
+        pb.style.display = 'inline-block';
+    }
+
+    // Update UI
+    updateUI(delta);
+}
+
+// ─── UI Update ───────────────────────────────────────────────────────────
+
+let lastMoneyDisplay = 0;
+let moneyAnimFrame   = null;
+
+function updateUI(delta) {
+    // Top bar
+    const moneyEl = document.getElementById('stat-money');
+    if (Math.abs(G.money - lastMoneyDisplay) > 0.01) {
+        moneyEl.classList.remove('money-pop');
+        void moneyEl.offsetWidth;
+        moneyEl.classList.add('money-pop');
+        lastMoneyDisplay = G.money;
+    }
+    moneyEl.textContent = fmtMoney(G.money);
+
+    document.getElementById('stat-income').textContent  = fmtMoney(derived.incomePerSec) + '/s';
+    document.getElementById('stat-miners').textContent  = fmt(derived.totalMiners);
+    document.getElementById('stat-ores').textContent    = fmt(derived.totalOrePerSec);
+    document.getElementById('stat-total').textContent   = fmtMoney(G.totalEarned);
+
+    if (G.mkp > 0) {
+        document.getElementById('stat-mkp-container').style.display = '';
+        document.getElementById('stat-mkp').textContent = fmt(G.mkp) + ' MKP';
+    }
+
+    // current ore badge
+    const ore = derived.currentOre;
+    document.getElementById('badge-name').textContent = ore.name;
+    document.getElementById('badge-dot').style.background = ore.color;
+    document.getElementById('ore-svg-label').textContent = 'Mining ' + ore.name;
+    document.getElementById('ore-svg-label').setAttribute('fill', ore.color);
+
+    // Rock color hint
+    const rockPoly = document.querySelector('#rock-group polygon');
+    if (rockPoly) {
+        rockPoly.setAttribute('fill', shadeColor(ore.color, -60));
+    }
+
+    // Ore stat list (left panel)
+    updateOreStatList();
+
+    // Ore cards (center)
+    updateOreCards();
+
+    // Upgrades & units (right panel)
+    updateUpgradeCards();
+    updateUnitCards();
+
+    // MKP display
+    if (G.prestigeCount > 0) {
+        document.getElementById('mkp-display').style.display = 'flex';
+        document.getElementById('mkp-value-center').textContent = fmt(G.mkp) + ' MKP  (+' + fmt(calcMKPReward()) + ' on next prestige)';
+    }
+
+    // Event banner
+    updateEventBanner();
+
+    // Bottom unit summaries
+    updateUnitSummaries();
+}
+
+function shadeColor(hex, amount) {
+    let r = parseInt(hex.slice(1,3),16);
+    let g = parseInt(hex.slice(3,5),16);
+    let b = parseInt(hex.slice(5,7),16);
+    r = Math.max(0, Math.min(255, r+amount));
+    g = Math.max(0, Math.min(255, g+amount));
+    b = Math.max(0, Math.min(255, b+amount));
+    return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+function updateOreStatList() {
+    const container = document.getElementById('ore-stats-list');
+    container.innerHTML = '';
+    for (const ot of ORE_TYPES) {
+        const unlocked = G.totalEarned >= ot.unlock;
+        const row = document.createElement('div');
+        row.className = 'ore-stat-row' + (unlocked ? ' active' : ' locked');
+        row.innerHTML = `
+            <span class="ore-dot" style="background:${ot.color}"></span>
+            <span class="ore-name">${ot.name}</span>
+            <span class="ore-val">${unlocked ? fmt(G.ore[ot.id]) : '???'}</span>`;
+        container.appendChild(row);
+    }
+}
+
+let oreCardEls = {};
+
+function buildOreCards() {
+    const container = document.getElementById('ore-cards');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '8px';
+
+    for (const ot of ORE_TYPES) {
+        const card = document.createElement('div');
+        card.className = 'ore-card';
+        card.id = 'ore-card-' + ot.id;
+        card.style.color = ot.color;
+        card.innerHTML = `
+            <div class="ore-card-icon" style="background:${ot.color}22">
+                <span>${ot.emoji}</span>
+            </div>
+            <div class="ore-card-info">
+                <div class="ore-card-name" style="color:${ot.color}">${ot.name}</div>
+                <div class="ore-card-rate">Value: ${fmtMoney(ot.value)} each</div>
+            </div>
+            <div class="ore-card-amount" style="color:${ot.color}" id="ore-amt-${ot.id}">0</div>
+            <div class="ore-card-bar" id="ore-bar-${ot.id}" style="width:0%"></div>
+        `;
+        container.appendChild(card);
+        oreCardEls[ot.id] = card;
+    }
+}
+
+function updateOreCards() {
+    for (const ot of ORE_TYPES) {
+        const unlocked = G.totalEarned >= ot.unlock;
+        const card = document.getElementById('ore-card-' + ot.id);
+        if (!card) continue;
+
+        card.classList.toggle('locked', !unlocked);
+
+        if (unlocked) {
+            document.getElementById('ore-amt-' + ot.id).textContent = fmt(G.ore[ot.id]);
+            // update rate label dynamically
+            const rateEl = card.querySelector('.ore-card-rate');
+            rateEl.textContent = 'Value: ' + fmtMoney(ot.value * derived.valueMult * derived.mkpValueMult) + ' each';
+        }
+    }
+}
+
+let upgradeCardEls = {};
+
+function buildUpgradeCards() {
+    const container = document.getElementById('tab-upgrades');
+    container.innerHTML = '';
+    for (const upg of UPGRADES) {
+        if (upg.mkp) continue; // skip MKP upgrades for now
+        const card = document.createElement('div');
+        card.className = 'upgrade-card';
+        card.id = 'upg-' + upg.id;
+        card.onclick = () => buyUpgrade(upg.id);
+        card.innerHTML = `
+            <div class="upgrade-header">
+                <span class="upgrade-icon">${upg.icon}</span>
+                <span class="upgrade-name">${upg.name}</span>
+                <span class="upgrade-cost" id="upg-cost-${upg.id}">${fmtMoney(upg.cost)}</span>
+                <span class="bought-badge">✓ Bought</span>
+            </div>
+            <div class="upgrade-desc">${upg.desc}</div>
+        `;
+        container.appendChild(card);
+        upgradeCardEls[upg.id] = card;
+    }
+
+    // MKP upgrades section (hidden until prestige)
+    const mkpSection = document.createElement('div');
+    mkpSection.id = 'mkp-upgrades-section';
+    mkpSection.style.display = 'none';
+    mkpSection.innerHTML = '<div class="section-sep"></div><div class="panel-title" style="padding:4px 0">Mining Knowledge Upgrades</div>';
+
+    for (const upg of UPGRADES) {
+        if (!upg.mkp) continue;
+        const card = document.createElement('div');
+        card.className = 'upgrade-card';
+        card.id = 'upg-' + upg.id;
+        card.onclick = () => buyMKPUpgrade(upg.id);
+        card.innerHTML = `
+            <div class="upgrade-header">
+                <span class="upgrade-icon">${upg.icon}</span>
+                <span class="upgrade-name">${upg.name}</span>
+                <span class="upgrade-cost" id="upg-cost-${upg.id}">${upg.cost} MKP</span>
+                <span class="bought-badge">✓ Bought</span>
+            </div>
+            <div class="upgrade-desc">${upg.desc}</div>
+        `;
+        mkpSection.appendChild(card);
+        container.appendChild(mkpSection);
+        upgradeCardEls[upg.id] = card;
+    }
+}
+
+function updateUpgradeCards() {
+    // regular upgrades
+    for (const upg of UPGRADES) {
+        if (upg.mkp) continue;
+        const card = upgradeCardEls[upg.id];
+        if (!card) continue;
+
+        const bought    = !!G.upgrades[upg.id];
+        const canSee    = G.totalEarned >= upg.req || bought;
+        const canAfford = G.money >= upg.cost;
+
+        card.style.display = canSee ? '' : 'none';
+        card.classList.toggle('bought', bought);
+        card.classList.toggle('locked', !canAfford && !bought);
+
+        const costEl = document.getElementById('upg-cost-' + upg.id);
+        if (costEl) costEl.classList.toggle('cant-afford', !canAfford && !bought);
+    }
+
+    // MKP upgrades
+    const sec = document.getElementById('mkp-upgrades-section');
+    if (sec) sec.style.display = G.prestigeCount > 0 ? '' : 'none';
+
+    for (const upg of UPGRADES) {
+        if (!upg.mkp) continue;
+        const card = upgradeCardEls[upg.id];
+        if (!card) continue;
+
+        const bought    = !!G.mkpUpgrades[upg.id];
+        const canAfford = G.mkp >= upg.cost;
+
+        card.classList.toggle('bought', bought);
+        card.classList.toggle('locked', !canAfford && !bought);
+
+        const costEl = document.getElementById('upg-cost-' + upg.id);
+        if (costEl) costEl.classList.toggle('cant-afford', !canAfford && !bought);
+    }
+}
+
+let unitCardEls = {};
+
+function buildUnitCards() {
+    const container = document.getElementById('tab-units');
+    container.innerHTML = '';
+    for (const unit of UNITS) {
+        const card = document.createElement('div');
+        card.className = 'unit-card';
+        card.id = 'unit-' + unit.id;
+        card.onclick = () => buyUnit(unit.id);
+        card.innerHTML = `
+            <div class="unit-header">
+                <span class="unit-icon">${unit.icon}</span>
+                <span class="unit-name">${unit.name}</span>
+                <span class="unit-count" id="unit-count-${unit.id}">0</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+                <span class="unit-prod">${fmt(unit.orePerSec)} ore/sec each</span>
+                <span class="unit-cost" id="unit-cost-${unit.id}">${fmtMoney(unitCost(unit))}</span>
+            </div>
+        `;
+        container.appendChild(card);
+        unitCardEls[unit.id] = card;
+    }
+}
+
+function updateUnitCards() {
+    for (const unit of UNITS) {
+        const card = unitCardEls[unit.id];
+        if (!card) continue;
+
+        const cost      = unitCost(unit);
+        const canAfford = G.money >= cost;
+        // Unit becomes visible once the player has earned at least half its base cost
+        const unlocked  = G.totalEarned >= unit.baseCost * 0.5;
+
+        card.classList.toggle('locked', !unlocked);
+
+        document.getElementById('unit-count-' + unit.id).textContent = fmt(G.units[unit.id]);
+        const costEl = document.getElementById('unit-cost-' + unit.id);
+        costEl.textContent = fmtMoney(cost);
+        costEl.classList.toggle('cant-afford', !canAfford);
+    }
+}
+
+function buildAchievementCards() {
+    const container = document.getElementById('tab-achievements');
+    container.innerHTML = '';
+    for (const ach of ACHIEVEMENTS) {
+        const card = document.createElement('div');
+        card.className = 'achievement-card locked';
+        card.id = 'ach-' + ach.id;
+        card.innerHTML = `
+            <span class="ach-icon">${ach.icon}</span>
+            <div>
+                <div class="ach-name">${ach.name}</div>
+                <div class="ach-desc">${ach.desc}</div>
+            </div>
+        `;
+        container.appendChild(card);
+    }
+}
+
+function updateAchievementCards() {
+    for (const ach of ACHIEVEMENTS) {
+        const card = document.getElementById('ach-' + ach.id);
+        if (!card) continue;
+        const earned = !!G.achievements[ach.id];
+        card.classList.toggle('earned', earned);
+        card.classList.toggle('locked', !earned);
+    }
+}
+
+function updateUnitSummaries() {
+    const container = document.getElementById('unit-summaries');
+    container.innerHTML = '';
+    for (const unit of UNITS) {
+        if (G.units[unit.id] === 0) continue;
+        const div = document.createElement('div');
+        div.className = 'unit-summary';
+        div.innerHTML = `
+            <span class="us-icon">${unit.icon}</span>
+            <span class="us-count">${fmt(G.units[unit.id])}</span>
+            <span class="us-prod">${unit.name}s · ${fmt(G.units[unit.id]*unit.orePerSec)} ore/s</span>
+        `;
+        container.appendChild(div);
+    }
+}
+
+// ─── Buy Actions ─────────────────────────────────────────────────────────
+
+function buyUpgrade(id) {
+    const upg = UPGRADES.find(u => u.id === id && !u.mkp);
+    if (!upg || G.upgrades[id]) return;
+    if (G.money < upg.cost) { toast('Not enough money!', 'red'); return; }
+    G.money -= upg.cost;
+    G.upgrades[id] = true;
+    recompute();
+    const card = upgradeCardEls[id];
+    if (card) { card.classList.add('buying'); setTimeout(() => card.classList.remove('buying'), 400); }
+    toast('Purchased: ' + upg.name, 'gold');
+    spawnParticles('#f5c842', 8);
+}
+
+function buyMKPUpgrade(id) {
+    const upg = UPGRADES.find(u => u.id === id && u.mkp);
+    if (!upg || G.mkpUpgrades[id]) return;
+    if (G.mkp < upg.cost) { toast('Not enough MKP!', 'red'); return; }
+    G.mkp -= upg.cost;
+    G.mkpUpgrades[id] = true;
+    recompute();
+    toast('Purchased: ' + upg.name + ' (MKP)', 'purple');
+}
+
+function buyUnit(id) {
+    const unit = UNITS.find(u => u.id === id);
+    if (!unit) return;
+    const cost = unitCost(unit);
+    if (G.money < cost) { toast('Not enough money!', 'red'); return; }
+    G.money -= cost;
+    G.units[id]++;
+    recompute();
+    const card = unitCardEls[id];
+    if (card) { card.classList.add('buying'); setTimeout(() => card.classList.remove('buying'), 400); }
+
+    // Check first-buy toasts
+    if (G.units[id] === 1) toast('Hired first ' + unit.name + '!', 'green');
+    spawnParticles('#3ecf6a', 5);
+}
+
+// ─── Ore Unlock Animations ───────────────────────────────────────────────
+
+let prevUnlockedOres = new Set(['stone']);
+
+function checkOreUnlocks() {
+    for (const ot of ORE_TYPES) {
+        if (!prevUnlockedOres.has(ot.id) && G.totalEarned >= ot.unlock) {
+            prevUnlockedOres.add(ot.id);
+            const card = document.getElementById('ore-card-' + ot.id);
+            if (card) {
+                card.classList.add('unlocking');
+                setTimeout(() => card.classList.remove('unlocking'), 1100);
+            }
+            toast('🎉 Unlocked: ' + ot.name + ' Ore!', 'blue');
+        }
+    }
+}
+
+// ─── Achievements ────────────────────────────────────────────────────────
+
+function checkAchievements() {
+    let newUnlock = false;
+    for (const ach of ACHIEVEMENTS) {
+        if (!G.achievements[ach.id] && ach.check(G)) {
+            G.achievements[ach.id] = true;
+            toast('🏆 Achievement: ' + ach.name, 'gold');
+            newUnlock = true;
+        }
+    }
+    if (newUnlock) updateAchievementCards();
+    checkOreUnlocks();
+}
+
+// ─── Random Events ───────────────────────────────────────────────────────
+
+function triggerRandomEvent() {
+    const ev = RANDOM_EVENTS[Math.floor(Math.random() * RANDOM_EVENTS.length)];
+    G.event = { id: ev.id, timer: ev.duration, factor: ev.factor, valueEvent: !!ev.valueEvent };
+
+    if (ev.valueEvent) {
+        derived.eventMult = 1;
+        derived.eventValueMult = ev.factor;
+    } else if (ev.type === 'buff') {
+        derived.eventMult = ev.factor;
+        derived.eventValueMult = 1;
+    } else {
+        derived.eventMult = ev.factor;
+        derived.eventValueMult = 1;
+    }
+
+    const banner = document.getElementById('event-banner');
+    banner.style.display = 'flex';
+    banner.className = ev.type === 'debuff' ? 'bad' : '';
+    document.getElementById('event-icon').textContent  = ev.icon;
+    document.getElementById('event-name').textContent  = ev.name;
+    document.getElementById('event-desc').textContent  = ev.desc;
+    toast(ev.icon + ' ' + ev.name, ev.type === 'debuff' ? 'red' : 'green');
+}
+
+function endEvent() {
+    G.event = null;
+    derived.eventMult = 1;
+    derived.eventValueMult = 1;
+    G.eventCooldown = 60;
+    document.getElementById('event-banner').style.display = 'none';
+}
+
+function updateEventBanner() {
+    if (!G.event) return;
+    document.getElementById('event-timer').textContent = Math.ceil(G.event.timer) + 's';
+}
+
+// ─── Prestige ────────────────────────────────────────────────────────────
+
+function calcMKPReward() {
+    return Math.floor(Math.log10(G.totalEarned / 1e6)) + 1;
+}
+
+function openPrestigeModal() {
+    const reward = calcMKPReward();
+    document.getElementById('modal-mkp-reward').textContent = '+' + reward + ' MKP';
+    document.getElementById('modal-current-mkp').textContent = fmt(G.mkp);
+    document.getElementById('prestige-modal').classList.add('open');
+}
+
+function closePrestigeModal() {
+    document.getElementById('prestige-modal').classList.remove('open');
+}
+
+function confirmPrestige() {
+    const reward = calcMKPReward();
+    G.mkp += reward;
+    G.prestigeCount++;
+
+    // Preserve mkp & mkpUpgrades & achievements & prestigeCount
+    const { mkp, mkpUpgrades, achievements, prestigeCount } = G;
+    G = freshState();
+    G.mkp = mkp;
+    G.mkpUpgrades = mkpUpgrades;
+    G.achievements = achievements;
+    G.prestigeCount = prestigeCount;
+
+    prevUnlockedOres = new Set(['stone']);
+    derived.eventMult = 1;
+    derived.eventValueMult = 1;
+
+    closePrestigeModal();
+    recompute();
+    toast('⚡ Prestige! You gained ' + reward + ' MKP!', 'purple');
+    document.getElementById('prestige-btn').style.display = 'none';
+    document.getElementById('mkp-display').style.display = 'flex';
+    document.getElementById('stat-mkp-container').style.display = '';
+
+    saveGame();
+}
+
+// ─── Tab switching ───────────────────────────────────────────────────────
+
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        const names = ['upgrades','units','achievements'];
+        b.classList.toggle('active', names[i] === name);
+    });
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── Particles ───────────────────────────────────────────────────────────
+
+function spawnParticles(color, count) {
+    const scene = document.getElementById('miner-scene');
+    if (!scene) return;
+    const rect = scene.getBoundingClientRect();
+    const cx   = rect.left + rect.width / 2;
+    const cy   = rect.top  + rect.height * 0.6;
+    const container = document.getElementById('particle-container');
+
+    for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.className = 'ore-particle';
+        p.style.background = color;
+        p.style.left = (cx + (Math.random()-0.5)*40) + 'px';
+        p.style.top  = (cy + (Math.random()-0.5)*30) + 'px';
+        const angle  = (Math.random() * 360) * Math.PI / 180;
+        const dist   = 40 + Math.random() * 60;
+        p.style.setProperty('--dx', Math.cos(angle)*dist + 'px');
+        p.style.setProperty('--dy', (Math.sin(angle)*dist - 30) + 'px');
+        p.style.boxShadow = `0 0 6px ${color}`;
+        container.appendChild(p);
+        setTimeout(() => p.remove(), 900);
+    }
+}
+
+// ─── Toasts ──────────────────────────────────────────────────────────────
+
+function toast(msg, type='blue') {
+    const container = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(() => el.remove(), 3100);
+}
+
+// ─── Save / Load ─────────────────────────────────────────────────────────
+
+function saveGame() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(G));
+    } catch(e) {}
+}
+
+function loadGame() {
+    try {
+        const raw = localStorage.getItem(SAVE_KEY);
+        if (!raw) return false;
+        const saved = JSON.parse(raw);
+        // Merge to handle new keys
+        G = Object.assign(freshState(), saved);
+        // Restore nested objects
+        G.ore      = Object.assign(Object.fromEntries(ORE_TYPES.map(o=>[o.id,0])),  saved.ore      || {});
+        G.units    = Object.assign(Object.fromEntries(UNITS.map(u=>[u.id,0])),       saved.units    || {});
+        G.upgrades = saved.upgrades    || {};
+        G.mkpUpgrades = saved.mkpUpgrades || {};
+        G.achievements = saved.achievements || {};
+
+        // rebuild prevUnlockedOres
+        prevUnlockedOres = new Set(['stone']);
+        for (const ot of ORE_TYPES) {
+            if (G.totalEarned >= ot.unlock) prevUnlockedOres.add(ot.id);
+        }
+        return true;
+    } catch(e) {
+        return false;
+    }
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────
+
+function init() {
+    loadGame();
+    buildOreCards();
+    buildUpgradeCards();
+    buildUnitCards();
+    buildAchievementCards();
+    recompute();
+    updateAchievementCards();
+
+    // Start game loop (20 ticks/sec is sufficient for smooth number updates)
+    lastTick = Date.now();
+    tickInterval = setInterval(gameTick, 50);
+
+    // Auto-save every 10 seconds
+    setInterval(saveGame, 10000);
+
+    // Save on page close
+    window.addEventListener('beforeunload', saveGame);
+
+    // Initial UI render
+    updateUI(0);
+
+    toast('Welcome back to Ore Empire!', 'blue');
+}
+
+init();
+</script>
 </body>
 </html>
